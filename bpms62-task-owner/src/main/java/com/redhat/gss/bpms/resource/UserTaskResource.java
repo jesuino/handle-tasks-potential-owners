@@ -8,10 +8,12 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 
+import org.kie.api.runtime.manager.Context;
 import org.kie.api.runtime.manager.RuntimeEngine;
 import org.kie.api.runtime.manager.RuntimeManager;
 import org.kie.api.task.TaskService;
 import org.kie.api.task.model.OrganizationalEntity;
+import org.kie.api.task.model.PeopleAssignments;
 import org.kie.api.task.model.Task;
 import org.kie.internal.runtime.manager.context.EmptyContext;
 import org.kie.internal.task.api.InternalTaskService;
@@ -22,39 +24,47 @@ import com.redhat.gss.bpms.base.RuntimeService;
 @Path("")
 @Stateless
 public class UserTaskResource {
-	
+
 	@EJB
 	RuntimeService service;
 
 	@POST
 	@Path("/add")
 	public void add(@QueryParam("taskId") Long taskId,
-			@QueryParam("userId") String userId) {
+			@QueryParam("userId") String id) {
 		RuntimeManager manager = service.getManager();
-		RuntimeEngine runtime = manager.getRuntimeEngine(EmptyContext
-				.get());
+		Context<String> context = EmptyContext.get();
+		RuntimeEngine runtime = manager.getRuntimeEngine(context);
 		TaskService taskService = runtime.getTaskService();
-        Task task = taskService.getTaskById(taskId);
-        List<OrganizationalEntity> potentialOwners = ((InternalPeopleAssignments)task.getPeopleAssignments()).getPotentialOwners();
-        OrganizationalEntity user = ((InternalTaskService) taskService).getOrganizationalEntityById(userId);
-        potentialOwners.add(user);
-        ((InternalPeopleAssignments)task.getPeopleAssignments()).setPotentialOwners(potentialOwners);
-        manager.disposeRuntimeEngine(runtime);
+		Task task = taskService.getTaskById(taskId);
+		PeopleAssignments pplAssignments = task.getPeopleAssignments();
+		InternalPeopleAssignments assignments = (InternalPeopleAssignments) pplAssignments;
+		List<OrganizationalEntity> owners = assignments.getPotentialOwners();
+		InternalTaskService iTaskService = (InternalTaskService) taskService;
+		OrganizationalEntity usr = iTaskService.getOrganizationalEntityById(id);
+		owners.add(usr);
+		assignments.setPotentialOwners(owners);
+		manager.disposeRuntimeEngine(runtime);
 	}
 
 	@POST
 	@Path("/remove")
 	public void remove(@QueryParam("taskId") Long taskId,
-			@QueryParam("userId") String userId) {
+			@QueryParam("userId") String id) {
 		RuntimeManager manager = service.getManager();
-		RuntimeEngine runtime = manager.getRuntimeEngine(EmptyContext
-				.get());
+		Context<String> ctx = EmptyContext.get();
+		RuntimeEngine runtime = manager.getRuntimeEngine(ctx);
 		TaskService taskService = runtime.getTaskService();
 		Task task = taskService.getTaskById(taskId);
-		List<OrganizationalEntity> excludedOwners = ((InternalPeopleAssignments) task.getPeopleAssignments()).getExcludedOwners();
-		OrganizationalEntity user = ((InternalTaskService) taskService).getOrganizationalEntityById(userId);
-		excludedOwners.add(user);
-		((InternalPeopleAssignments) task.getPeopleAssignments()).setExcludedOwners(excludedOwners);
+		System.out.println(task);
+		PeopleAssignments peopleAssignments = task.getPeopleAssignments();
+		InternalPeopleAssignments assignments = (InternalPeopleAssignments) peopleAssignments;
+		List<OrganizationalEntity> excluded = assignments.getExcludedOwners();
+		InternalTaskService iTaskService = (InternalTaskService) taskService;
+		OrganizationalEntity usr = iTaskService.getOrganizationalEntityById(id);
+		excluded.add(usr);
+		assignments.setExcludedOwners(excluded);
+		assignments.getPotentialOwners().remove(usr);
 		manager.disposeRuntimeEngine(runtime);
 	}
 }
